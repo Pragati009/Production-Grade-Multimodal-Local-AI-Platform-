@@ -1,0 +1,22 @@
+# API
+fastapi==0.135.1
+uvicorn==0.41.0
+requests==2.32.3
+
+# RAG / Embeddings
+sentence-transformers==5.2.3
+faiss-cpu==1.13.2
+pypdf==6.7.5
+numpy==2.2.5
+
+# Fine-tuning (LoRA)
+torch==2.10.0
+transformers==5.3.0
+peft==0.19.1
+trl==1.2.0
+datasets==4.8.4
+accelerate==1.13.0
+
+# Monitoring
+prometheus_client==0.21.1
+psutil==7.0.0

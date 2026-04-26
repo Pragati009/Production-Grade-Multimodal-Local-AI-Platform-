@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+uvicorn.log
+finetune.log
+compare.log
+
+# Database (contains user data)
+chat_memory.db
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large model checkpoints (keep only final adapter)
+ml_adapter/checkpoint-*/
+
+# PDF (copyrighted — user must provide their own)
+*.pdf
+
+# Jupyter
+.ipynb_checkpoints/
