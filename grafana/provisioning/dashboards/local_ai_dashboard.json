@@ -2,89 +2,127 @@
   "title": "Local AI Chat Monitor",
   "uid": "local-ai-chat",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "5s",
-  "time": { "from": "now-15m", "to": "now" },
+  "time": { "from": "now-30m", "to": "now" },
+  "style": "dark",
+  "tags": ["ai", "rag", "lora"],
   "panels": [
+
     {
       "id": 1,
-      "title": "AI Response Latency (seconds)",
+      "title": "⏱ Response Latency",
+      "description": "How fast the AI answers. Lower = faster. P95 shows worst-case response time.",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 9 },
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "rate(request_latency_seconds_sum[1m]) / rate(request_latency_seconds_count[1m])",
-          "legendFormat": "Avg latency (s)"
+          "expr": "rate(request_latency_seconds_sum[2m]) / rate(request_latency_seconds_count[2m])",
+          "legendFormat": "Avg latency"
         },
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket[1m]))",
-          "legendFormat": "P95 latency (s)"
+          "expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket[2m]))",
+          "legendFormat": "P95 latency"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" }
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 30 }
+            ]
+          }
         }
       },
       "options": {
-        "tooltip": { "mode": "multi" },
+        "tooltip": { "mode": "multi", "sort": "desc" },
         "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
+
     {
       "id": 2,
-      "title": "Hallucination Rate (failures / min)",
+      "title": "🧠 Hallucination Rate vs Success Rate",
+      "description": "Hallucinations = AI could not find the answer. Success = AI found answer in context.",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 9 },
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "rate(failed_responses_total[1m])",
-          "legendFormat": "Hallucinations / sec"
+          "expr": "rate(failed_responses_total[2m]) * 60",
+          "legendFormat": "Hallucinations / min"
         },
         {
           "datasource": "Prometheus",
-          "expr": "rate(request_count_total[1m])",
-          "legendFormat": "Total requests / sec"
+          "expr": "rate(retrieval_success_total[2m]) * 60",
+          "legendFormat": "Successful answers / min"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(request_count_total[2m]) * 60",
+          "legendFormat": "Total requests / min"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
-          "color": { "mode": "palette-classic" }
-        }
+          "unit": "reqpm",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Hallucinations / min" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#f2495c", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Successful answers / min" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#73bf69", "mode": "fixed" } }]
+          }
+        ]
       },
       "options": {
-        "tooltip": { "mode": "multi" },
+        "tooltip": { "mode": "multi", "sort": "desc" },
         "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
+
     {
       "id": 3,
-      "title": "CPU Usage (%)",
+      "title": "💻 CPU Usage",
+      "description": "CPU % used by the AI server. Red above 85%.",
       "type": "gauge",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 9, "w": 6, "h": 8 },
       "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "cpu_usage_percent",
-          "legendFormat": "CPU %"
-        }
+        { "datasource": "Prometheus", "expr": "cpu_usage_percent", "legendFormat": "CPU %" }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "min": 0,
-          "max": 100,
+          "min": 0, "max": 100,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 60 },
-              { "color": "red", "value": 85 }
+              { "color": "#73bf69", "value": null },
+              { "color": "#fade2a", "value": 60 },
+              { "color": "#f2495c", "value": 85 }
             ]
           },
           "color": { "mode": "thresholds" }
@@ -93,33 +131,31 @@
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": { "titleSize": 14, "valueSize": 36 }
       }
     },
+
     {
       "id": 4,
-      "title": "RAM Usage (%)",
+      "title": "🧮 RAM Usage",
+      "description": "System RAM % used. Red above 90%.",
       "type": "gauge",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 6, "y": 9, "w": 6, "h": 8 },
       "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "memory_usage_percent",
-          "legendFormat": "RAM %"
-        }
+        { "datasource": "Prometheus", "expr": "memory_usage_percent", "legendFormat": "RAM %" }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "min": 0,
-          "max": 100,
+          "min": 0, "max": 100,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 70 },
-              { "color": "red", "value": 90 }
+              { "color": "#73bf69", "value": null },
+              { "color": "#fade2a", "value": 70 },
+              { "color": "#f2495c", "value": 90 }
             ]
           },
           "color": { "mode": "thresholds" }
@@ -128,82 +164,286 @@
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": { "titleSize": 14, "valueSize": 36 }
       }
     },
-    {
-      "id": 7,
-      "title": "Active Model (0=Base 1=Fine-Tuned)",
-      "type": "stat",
-      "gridPos": { "x": 0, "y": 16, "w": 6, "h": 4 },
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "active_model",
-          "legendFormat": "Model"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            { "type": "value", "options": { "0": { "text": "Base (Gemma)", "color": "blue" }, "1": { "text": "Fine-Tuned (GPT-2)", "color": "green" } } }
-          ],
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "color": "blue", "value": null }, { "color": "green", "value": 1 }] }
-        }
-      },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" }
-    },
+
     {
       "id": 5,
-      "title": "Total Requests",
-      "type": "stat",
-      "gridPos": { "x": 0, "y": 16, "w": 6, "h": 4 },
+      "title": "📄 Retrieval Quality (FAISS Distance)",
+      "description": "Average L2 distance of retrieved document chunks. Lower = AI found more relevant context. Green < 100 is good.",
+      "type": "gauge",
+      "gridPos": { "x": 12, "y": 9, "w": 6, "h": 8 },
       "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "request_count_total",
-          "legendFormat": "Requests"
-        }
+        { "datasource": "Prometheus", "expr": "retrieval_avg_distance", "legendFormat": "Avg distance" }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "color": { "mode": "thresholds" },
+          "unit": "none",
+          "min": 0, "max": 300,
+          "decimals": 1,
           "thresholds": {
-            "steps": [{ "color": "blue", "value": null }]
-          }
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73bf69", "value": null },
+              { "color": "#fade2a", "value": 100 },
+              { "color": "#f2495c", "value": 200 }
+            ]
+          },
+          "color": { "mode": "thresholds" },
+          "mappings": []
         }
       },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" }
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": { "titleSize": 14, "valueSize": 36 }
+      }
     },
+
     {
       "id": 6,
-      "title": "Total Hallucinations",
+      "title": "🤖 Active Model",
+      "description": "Which AI model is currently handling requests.",
       "type": "stat",
-      "gridPos": { "x": 6, "y": 16, "w": 6, "h": 4 },
+      "gridPos": { "x": 18, "y": 9, "w": 6, "h": 8 },
       "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "failed_responses_total",
-          "legendFormat": "Hallucinations"
-        }
+        { "datasource": "Prometheus", "expr": "active_model", "legendFormat": "Model" }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "none",
           "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "🧠 Base\n(Gemma 2b)", "color": "#4f8ef7" },
+                "1": { "text": "⚡ Fine-Tuned\n(GPT-2+LoRA)", "color": "#73bf69" }
+              }
+            }
+          ],
           "thresholds": {
+            "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              { "color": "#4f8ef7", "value": null },
+              { "color": "#73bf69", "value": 1 }
             ]
           }
         }
       },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" }
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "titleSize": 14, "valueSize": 28 }
+      }
+    },
+
+    {
+      "id": 7,
+      "title": "📈 Retrieval Quality Over Time",
+      "description": "FAISS L2 distance trend — spikes mean queries that didn't match document content well.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 17, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "retrieval_avg_distance",
+          "legendFormat": "Avg FAISS distance (lower = better)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "fixedColor": "#5794f2", "mode": "fixed" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "✅ Answer Success Rate",
+      "description": "% of questions where AI found the answer vs hallucinated.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 17, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(retrieval_success_total[5m]) / (rate(retrieval_success_total[5m]) + rate(failed_responses_total[5m]) + 0.0001) * 100",
+          "legendFormat": "Success rate %"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(failed_responses_total[5m]) / (rate(retrieval_success_total[5m]) + rate(failed_responses_total[5m]) + 0.0001) * 100",
+          "legendFormat": "Hallucination rate %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Success rate %" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#73bf69", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Hallucination rate %" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#f2495c", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+
+    {
+      "id": 9,
+      "title": "📊 Total Requests",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 25, "w": 6, "h": 5 },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "request_count_total", "legendFormat": "Requests" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "fixedColor": "#5794f2", "mode": "fixed" },
+          "thresholds": { "steps": [{ "color": "#5794f2", "value": null }] }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto",
+        "text": { "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 10,
+      "title": "✅ Successful Answers",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 25, "w": 6, "h": 5 },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "retrieval_success_total", "legendFormat": "Found" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "fixedColor": "#73bf69", "mode": "fixed" },
+          "thresholds": { "steps": [{ "color": "#73bf69", "value": null }] }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto",
+        "text": { "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 11,
+      "title": "❌ Hallucinations",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 25, "w": 6, "h": 5 },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "failed_responses_total", "legendFormat": "Failed" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73bf69", "value": null },
+              { "color": "#f2495c", "value": 1 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto",
+        "text": { "valueSize": 32 }
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "⚡ Avg Response Time",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 25, "w": 6, "h": 5 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(request_latency_seconds_sum[5m]) / rate(request_latency_seconds_count[5m])",
+          "legendFormat": "Avg latency"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73bf69", "value": null },
+              { "color": "#fade2a", "value": 10 },
+              { "color": "#f2495c", "value": 30 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto",
+        "text": { "valueSize": 32 }
+      }
     }
+
   ]
 }

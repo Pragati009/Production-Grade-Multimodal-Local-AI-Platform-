@@ -20,12 +20,14 @@ from prometheus_client import Counter, Histogram, Gauge, generate_latest
 app = FastAPI()
 
 # ── Prometheus metrics ────────────────────────────────────────────────────────
-REQUEST_COUNT    = Counter("request_count",         "Total API requests")
-REQUEST_LATENCY  = Histogram("request_latency_seconds", "Request latency in seconds")
-FAILED_RESPONSES = Counter("failed_responses",      "Responses not found in context")
-CPU_USAGE        = Gauge("cpu_usage_percent",        "CPU usage percent")
-MEMORY_USAGE     = Gauge("memory_usage_percent",     "RAM usage percent")
-ACTIVE_MODEL     = Gauge("active_model",             "Active model: 0=base 1=finetuned")
+REQUEST_COUNT       = Counter("request_count",            "Total API requests")
+REQUEST_LATENCY     = Histogram("request_latency_seconds","Request latency in seconds")
+FAILED_RESPONSES    = Counter("failed_responses",         "Responses not found in context")
+RETRIEVAL_SUCCESS   = Counter("retrieval_success",        "Requests where answer was found in context")
+RETRIEVAL_DISTANCE  = Gauge("retrieval_avg_distance",     "Avg FAISS L2 distance of top-k chunks (lower=better)")
+CPU_USAGE           = Gauge("cpu_usage_percent",          "CPU usage percent")
+MEMORY_USAGE        = Gauge("memory_usage_percent",       "RAM usage percent")
+ACTIVE_MODEL        = Gauge("active_model",               "Active model: 0=base 1=finetuned")
 
 # ── SQLite memory ─────────────────────────────────────────────────────────────
 conn   = sqlite3.connect("chat_memory.db", check_same_thread=False)
@@ -97,9 +99,12 @@ ACTIVE_MODEL.set(0)
 
 # ── Helper: retrieve PDF context via RAG ──────────────────────────────────────
 def retrieve_context(prompt: str, k: int = 3):
-    q_emb = embed_model.encode([prompt])
-    _, I  = faiss_index.search(np.array(q_emb), k=k)
-    retrieved = [{"chunk_id": int(idx), "text": chunks[idx]} for idx in I[0]]
+    q_emb   = embed_model.encode([prompt])
+    D, I    = faiss_index.search(np.array(q_emb), k=k)
+    avg_dist = float(np.mean(D[0]))
+    RETRIEVAL_DISTANCE.set(round(avg_dist, 4))
+    retrieved = [{"chunk_id": int(idx), "text": chunks[idx], "distance": round(float(D[0][j]), 4)}
+                 for j, idx in enumerate(I[0])]
     context   = "\n".join(r["text"] for r in retrieved)
     return context, retrieved
 
@@ -188,6 +193,8 @@ Answer:"""
 
     if "could not find" in answer.lower():
         FAILED_RESPONSES.inc()
+    else:
+        RETRIEVAL_SUCCESS.inc()
 
     cpu    = psutil.cpu_percent(interval=0.1)
     memory = psutil.virtual_memory().percent
