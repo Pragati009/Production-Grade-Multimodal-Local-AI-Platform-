@@ -96,10 +96,12 @@ current_model = "base"   # "base" | "finetuned"
 ACTIVE_MODEL.set(0)
 
 # ── Helper: retrieve PDF context via RAG ──────────────────────────────────────
-def retrieve_context(prompt: str, k: int = 3) -> str:
+def retrieve_context(prompt: str, k: int = 3):
     q_emb = embed_model.encode([prompt])
     _, I  = faiss_index.search(np.array(q_emb), k=k)
-    return "\n".join(chunks[idx] for idx in I[0])
+    retrieved = [{"chunk_id": int(idx), "text": chunks[idx]} for idx in I[0]]
+    context   = "\n".join(r["text"] for r in retrieved)
+    return context, retrieved
 
 # ── Helper: load recent conversation memory ───────────────────────────────────
 def load_memory(limit: int = 5) -> str:
@@ -142,8 +144,8 @@ def chat(prompt: str):
     global current_model
     start_time = time.time()
 
-    context     = retrieve_context(prompt)
-    memory_text = load_memory()
+    context, sources = retrieve_context(prompt)
+    memory_text      = load_memory()
 
     # ── Base model: Gemma 2b via Ollama (RAG-grounded) ────────────────────────
     if current_model == "base":
@@ -205,6 +207,7 @@ Answer:"""
         "model":    current_model,
         "response": answer,
         "latency":  round(latency, 2),
+        "sources":  sources if current_model == "base" else [],
     }
 
 
