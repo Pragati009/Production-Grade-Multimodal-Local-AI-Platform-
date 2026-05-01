@@ -17,6 +17,13 @@ trl==1.2.0
 datasets==4.8.4
 accelerate==1.13.0
 
+# Voice input
+openai-whisper
+sounddevice
+pyttsx3
+httpx
+python-multipart
+
 # Monitoring
 prometheus_client==0.21.1
 psutil==7.0.0

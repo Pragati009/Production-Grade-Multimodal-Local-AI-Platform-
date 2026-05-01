@@ -1,12 +1,14 @@
 import re
+import io
 import torch
 import requests
 import sqlite3
 import numpy as np
 import psutil
 import time
+import whisper
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
@@ -83,6 +85,11 @@ ft_pipe = pipeline(
     tokenizer=ft_tokenizer,
 )
 print("Fine-tuned model ready.")
+
+# ── Whisper tiny (loaded once at startup) ─────────────────────────────────────
+print("Loading Whisper tiny...")
+whisper_model = whisper.load_model("tiny")
+print("Whisper ready.")
 
 # ── Model toggle state ────────────────────────────────────────────────────────
 current_model = "base"   # "base" | "finetuned"
@@ -198,4 +205,38 @@ Answer:"""
         "model":    current_model,
         "response": answer,
         "latency":  round(latency, 2),
+    }
+
+
+@app.post("/voice")
+async def voice(file: UploadFile = File(...)):
+    """
+    Accept a WAV/MP3 audio file, transcribe with Whisper tiny,
+    then pass the transcription through the active AI model.
+    Returns: transcription + AI response + latency.
+    """
+    audio_bytes = await file.read()
+    audio_array = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+    result      = whisper_model.transcribe(audio_array, fp16=False, language="en")
+    question    = result["text"].strip()
+
+    if not question:
+        raise HTTPException(status_code=400, detail="Could not transcribe audio — please speak clearly.")
+
+    # Re-use the /chat logic by calling it internally
+    import httpx
+    async with httpx.AsyncClient() as client:
+        chat_resp = await client.get(
+            "http://localhost:8000/chat",
+            params={"prompt": question},
+            timeout=120,
+        )
+    chat_data = chat_resp.json()
+
+    return {
+        "transcription": question,
+        "model":         chat_data.get("model"),
+        "response":      chat_data.get("response"),
+        "latency":       chat_data.get("latency"),
     }
